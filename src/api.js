@@ -14,7 +14,7 @@ const NEWS_API_ENDPOINT = 'https://newsapi.org/v2/everything';
  * @returns {object} - Article with categorized metadata and safe defaults
  */
 export function normalizeArticle(article) {
-  const category = categorizeArticle(article.title || '');
+  const category = categorizeArticle(article.title || '', article.description || '');
   return {
     title: article.title || 'Untitled Article',
     description: article.description || 'No description available.',
