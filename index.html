@@ -6,23 +6,94 @@
   <title>IndoPress — Global News Dashboard</title>
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
-<body class="bg-slate-50 text-slate-900 min-h-screen">
-  <div id="app" class="max-w-7xl mx-auto px-4 py-8">
-    <header class="mb-8 text-center sm:text-left">
-      <h1 class="text-3xl font-bold tracking-tight text-slate-900">IndoPress</h1>
-      <p class="text-slate-600 mt-1">International press coverage of Indonesia</p>
-    </header>
+<body class="bg-slate-50 text-slate-900 min-h-screen font-sans antialiased flex flex-col">
 
-    <main id="main-content">
-      <div id="status-card" class="p-4 bg-white border border-slate-200 rounded-lg shadow-sm">
-        <h2 class="text-lg font-semibold mb-2">Iteration 1: Data Layer & Categorizer Initialized</h2>
-        <p class="text-sm text-slate-600 mb-3">Checking articles and automated categorization pipeline...</p>
-        <pre id="output-log" class="bg-slate-900 text-slate-100 p-4 rounded text-xs overflow-x-auto">Loading...</pre>
+  <!-- Top Navigation Bar -->
+  <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      
+      <!-- Brand Logo -->
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-red-600 flex items-center justify-center text-white font-black text-xl shadow-sm">
+          🇮🇩
+        </div>
+        <div>
+          <a href="#" class="text-xl font-extrabold tracking-tight text-slate-900 flex items-center">
+            Indo<span class="text-red-600">Press</span>
+          </a>
+          <p class="text-[11px] text-slate-500 hidden sm:block">Global news coverage of Indonesia</p>
+        </div>
       </div>
-    </main>
-  </div>
 
+      <!-- Live Connection Status Badge -->
+      <div class="flex items-center gap-3">
+        <div id="data-status-badge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
+          <span class="w-2 h-2 rounded-full bg-slate-400"></span>
+          <span>Connecting...</span>
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Main Content Container -->
+  <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
+
+    <!-- Page Title & Feed Intro -->
+    <div class="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200 pb-5">
+      <div>
+        <h2 class="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+          International Press Feed
+        </h2>
+        <p class="mt-1 text-sm text-slate-600">
+          Real-time global headlines mentioning Indonesia, auto-categorized by topic.
+        </p>
+      </div>
+      <div class="flex items-center gap-2 text-sm text-slate-600">
+        <span>Displaying</span>
+        <span id="article-count" class="font-bold text-slate-900 bg-slate-200 px-2 py-0.5 rounded text-xs">
+          0
+        </span>
+        <span>articles</span>
+      </div>
+    </div>
+
+    <!-- Article Cards Grid (1 col mobile, 2 col tablet, 3 col desktop) -->
+    <section id="article-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      <!-- Dynamic cards rendered by src/ui.js -->
+    </section>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="mt-auto border-t border-slate-200 bg-white py-6">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-slate-500">
+      <p>© 2026 IndoPress — Real-Time News Intelligence Dashboard.</p>
+      <div class="flex items-center gap-4">
+        <span>Powered by NewsAPI</span>
+        <span>•</span>
+        <span>Vanilla JS + Tailwind CSS</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Application Entry Point -->
   <script type="module" src="./src/main.js"></script>
 </body>
 </html>
