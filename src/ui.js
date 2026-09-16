@@ -1,10 +1,53 @@
 /**
  * IndoPress - UI Rendering Engine
- * Handles rendering article cards, skeletons, filter chips, source dropdowns, and empty states.
+ * Handles rendering article cards, stats metrics, skeletons, filter chips, and bookmarks.
  */
 
 // Elegant SVG placeholder when an article image is missing or fails to load
 export const DEFAULT_THUMBNAIL = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="340" viewBox="0 0 600 340"><rect width="600" height="340" fill="%23f1f5f9"/><circle cx="300" cy="140" r="48" fill="%23cbd5e1"/><path d="M260 210 h80 v12 h-80 z M250 232 h100 v8 h-100 z M270 248 h60 v8 h-60 z" fill="%2394a3b8"/><text x="50%25" y="290" text-anchor="middle" font-family="system-ui, sans-serif" font-size="14" font-weight="600" fill="%2364748b">IndoPress Newsroom</text></svg>`;
+
+const BOOKMARKS_STORAGE_KEY = 'indopress_bookmarks';
+
+/**
+ * Retrieves bookmarked articles from localStorage.
+ * @returns {Array}
+ */
+export function getBookmarks() {
+  if (typeof window === 'undefined' || !window.localStorage) return [];
+  try {
+    const raw = localStorage.getItem(BOOKMARKS_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Toggles bookmark status for an article.
+ * @param {object} article
+ * @returns {boolean} - True if newly bookmarked, false if removed
+ */
+export function toggleBookmark(article) {
+  if (typeof window === 'undefined' || !window.localStorage || !article?.url) return false;
+  try {
+    const current = getBookmarks();
+    const index = current.findIndex(a => a.url === article.url);
+    let isNowBookmarked = false;
+
+    if (index >= 0) {
+      current.splice(index, 1);
+      isNowBookmarked = false;
+    } else {
+      current.unshift(article);
+      isNowBookmarked = true;
+    }
+
+    localStorage.setItem(BOOKMARKS_STORAGE_KEY, JSON.stringify(current));
+    return isNowBookmarked;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Formats an ISO date string into a clean, human-readable date.
@@ -39,14 +82,33 @@ export function formatDate(isoString) {
 }
 
 /**
+ * Formats relative time from a given Date/timestamp for "Last Updated".
+ * @param {Date} date
+ * @returns {string}
+ */
+export function formatRelativeTime(date) {
+  if (!date) return 'just now';
+  const now = new Date();
+  const diffSec = Math.max(0, Math.floor((now - date) / 1000));
+
+  if (diffSec < 45) return 'just now';
+  if (diffSec < 90) return '1m ago';
+  const mins = Math.floor(diffSec / 60);
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  return `${hours}h ago`;
+}
+
+/**
  * Creates a single article card DOM element.
  * @param {object} article
+ * @param {Function} [onBookmarkChange]
  * @returns {HTMLElement}
  */
-export function createArticleCard(article) {
+export function createArticleCard(article, onBookmarkChange = null) {
   const card = document.createElement('article');
   card.className =
-    'group flex flex-col bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md hover:-translate-y-1 transition duration-200';
+    'group flex flex-col bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm hover:shadow-md hover:-translate-y-1 transition duration-200 relative';
 
   const category = article.category || {
     id: 'other',
@@ -55,25 +117,46 @@ export function createArticleCard(article) {
     color: 'bg-slate-100 text-slate-800 border-slate-200'
   };
 
+  const bookmarks = getBookmarks();
+  const isBookmarked = bookmarks.some(b => b.url === article.url);
   const formattedDate = formatDate(article.publishedAt);
   const imageUrl = article.urlToImage || DEFAULT_THUMBNAIL;
 
   card.innerHTML = `
     <!-- Thumbnail Image Container -->
-    <a href="${article.url}" target="_blank" rel="noopener noreferrer" class="block relative aspect-video bg-slate-100 overflow-hidden">
-      <img
-        src="${imageUrl}"
-        alt="${escapeHtml(article.title)}"
-        loading="lazy"
-        class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-      />
-      <div class="absolute top-3 left-3">
+    <div class="relative aspect-video bg-slate-100 overflow-hidden">
+      <a href="${article.url}" target="_blank" rel="noopener noreferrer" class="block w-full h-full">
+        <img
+          src="${imageUrl}"
+          alt="${escapeHtml(article.title)}"
+          loading="lazy"
+          class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+        />
+      </a>
+
+      <!-- Category Tag (Top-Left) -->
+      <div class="absolute top-3 left-3 pointer-events-none">
         <span class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold rounded-full border shadow-sm ${category.color} backdrop-blur-sm">
           <span>${category.icon}</span>
           <span>${category.label}</span>
         </span>
       </div>
-    </a>
+
+      <!-- Bookmark Button (Top-Right) -->
+      <button
+        type="button"
+        class="bookmark-btn absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition shadow-sm ${
+          isBookmarked
+            ? 'bg-red-600 text-white hover:bg-red-700'
+            : 'bg-slate-900/60 text-white hover:bg-slate-900 backdrop-blur-sm'
+        }"
+        title="${isBookmarked ? 'Remove from reading list' : 'Save to reading list'}"
+      >
+        <svg class="w-4 h-4 pointer-events-none" fill="${isBookmarked ? 'currentColor' : 'none'}" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z"/>
+        </svg>
+      </button>
+    </div>
 
     <!-- Card Body -->
     <div class="p-5 flex flex-col flex-1">
@@ -117,13 +200,33 @@ export function createArticleCard(article) {
     </div>
   `;
 
-  // Attach safe image fallback listener on image error
+  // Safe image fallback
   const imgElem = card.querySelector('img');
   if (imgElem) {
     imgElem.onerror = () => {
       imgElem.src = DEFAULT_THUMBNAIL;
       imgElem.onerror = null;
     };
+  }
+
+  // Bookmark button click handler
+  const bkmkBtn = card.querySelector('.bookmark-btn');
+  if (bkmkBtn) {
+    bkmkBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const added = toggleBookmark(article);
+      // Toggle button visual state
+      if (added) {
+        bkmkBtn.className = 'bookmark-btn absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition shadow-sm bg-red-600 text-white hover:bg-red-700';
+        bkmkBtn.querySelector('svg').setAttribute('fill', 'currentColor');
+        bkmkBtn.title = 'Remove from reading list';
+      } else {
+        bkmkBtn.className = 'bookmark-btn absolute top-3 right-3 w-8 h-8 rounded-full flex items-center justify-center transition shadow-sm bg-slate-900/60 text-white hover:bg-slate-900 backdrop-blur-sm';
+        bkmkBtn.querySelector('svg').setAttribute('fill', 'none');
+        bkmkBtn.title = 'Save to reading list';
+      }
+      if (onBookmarkChange) onBookmarkChange();
+    });
   }
 
   return card;
@@ -143,12 +246,77 @@ function escapeHtml(str) {
 }
 
 /**
+ * Renders quick stats metric cards.
+ * @param {object} stats - { totalArticles, totalSources, dominantCategory, latestTimeFormatted }
+ * @param {HTMLElement} container
+ */
+export function renderStatsRow(stats, container) {
+  if (!container) return;
+  const { totalArticles = 0, totalSources = 0, dominantCategory = null, latestTimeFormatted = 'Recent' } = stats;
+
+  const topCategoryLabel = dominantCategory
+    ? `${dominantCategory.icon} ${dominantCategory.label} (${dominantCategory.percentage}%)`
+    : 'Varied Topics';
+
+  container.innerHTML = `
+    <!-- Card 1: Total Coverage -->
+    <div class="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+      <div class="w-11 h-11 rounded-lg bg-red-50 text-red-600 flex items-center justify-center text-xl flex-shrink-0">
+        📰
+      </div>
+      <div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Coverage</p>
+        <p class="text-2xl font-black text-slate-900 leading-tight mt-0.5">${totalArticles}</p>
+        <p class="text-[11px] text-slate-500 mt-0.5">International stories</p>
+      </div>
+    </div>
+
+    <!-- Card 2: Global Outlets -->
+    <div class="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+      <div class="w-11 h-11 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xl flex-shrink-0">
+        🌐
+      </div>
+      <div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Global Outlets</p>
+        <p class="text-2xl font-black text-slate-900 leading-tight mt-0.5">${totalSources}</p>
+        <p class="text-[11px] text-slate-500 mt-0.5">Unique news publishers</p>
+      </div>
+    </div>
+
+    <!-- Card 3: Dominant Category -->
+    <div class="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+      <div class="w-11 h-11 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl flex-shrink-0">
+        🔥
+      </div>
+      <div class="min-w-0 flex-1">
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Dominant Topic</p>
+        <p class="text-lg font-bold text-slate-900 leading-tight mt-0.5 truncate">${topCategoryLabel}</p>
+        <p class="text-[11px] text-slate-500 mt-0.5">Top coverage focus</p>
+      </div>
+    </div>
+
+    <!-- Card 4: Latest Publication -->
+    <div class="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-sm flex items-center gap-4">
+      <div class="w-11 h-11 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-xl flex-shrink-0">
+        ⏱️
+      </div>
+      <div>
+        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Freshness</p>
+        <p class="text-2xl font-black text-slate-900 leading-tight mt-0.5">${latestTimeFormatted}</p>
+        <p class="text-[11px] text-slate-500 mt-0.5">Newest report</p>
+      </div>
+    </div>
+  `;
+}
+
+/**
  * Renders an array of articles into the specified container element.
  * @param {Array} articles
  * @param {HTMLElement} container
  * @param {Function} [onReset] - Optional callback for resetting filters when empty
+ * @param {Function} [onBookmarkChange] - Optional callback on bookmark toggle
  */
-export function renderCards(articles, container, onReset = null) {
+export function renderCards(articles, container, onReset = null, onBookmarkChange = null) {
   if (!container) return;
   container.innerHTML = '';
 
@@ -159,7 +327,7 @@ export function renderCards(articles, container, onReset = null) {
 
   const fragment = document.createDocumentFragment();
   articles.forEach(article => {
-    fragment.appendChild(createArticleCard(article));
+    fragment.appendChild(createArticleCard(article, onBookmarkChange));
   });
   container.appendChild(fragment);
 }
@@ -183,7 +351,7 @@ export function renderEmptyState(container, onReset) {
     <button
       id="reset-filters-btn"
       type="button"
-      class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition shadow-sm"
+      class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition shadow-sm cursor-pointer"
     >
       <span>✕</span>
       <span>Clear all filters</span>
@@ -199,21 +367,23 @@ export function renderEmptyState(container, onReset) {
 }
 
 /**
- * Renders category filter chips into the container.
+ * Renders category filter chips into the container including bookmarks.
  * @param {object} params
  * @param {HTMLElement} params.container
  * @param {object} params.categories
  * @param {string} params.activeCategory
- * @param {object} params.counts - { all: number, politics: number, ... }
- * @param {Function} params.onSelect - Callback receiving categoryId
+ * @param {object} params.counts
+ * @param {number} params.bookmarkCount
+ * @param {Function} params.onSelect
  */
-export function renderCategoryChips({ container, categories, activeCategory, counts, onSelect }) {
+export function renderCategoryChips({ container, categories, activeCategory, counts, bookmarkCount = 0, onSelect }) {
   if (!container) return;
   container.innerHTML = '';
 
   const totalCount = counts.all || 0;
   const chipList = [
     { id: 'all', label: 'All', icon: '🌐', count: totalCount },
+    { id: 'bookmarks', label: 'Saved', icon: '⭐', count: bookmarkCount },
     ...Object.values(categories).map(cat => ({
       id: cat.id,
       label: cat.label,
@@ -232,10 +402,10 @@ export function renderCategoryChips({ container, categories, activeCategory, cou
 
     if (isActive) {
       btn.className =
-        'flex-shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-slate-900 text-white shadow-sm transition';
+        'flex-shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-slate-900 text-white shadow-sm transition cursor-pointer';
     } else {
       btn.className =
-        'flex-shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 hover:text-slate-900 transition';
+        'flex-shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 hover:text-slate-900 transition cursor-pointer';
     }
 
     const countClass = isActive ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-600';
@@ -327,14 +497,14 @@ export function updateStatusBadge(badgeElem, isMock, count) {
       'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200';
     badgeElem.innerHTML = `
       <span class="w-2 h-2 rounded-full bg-amber-500"></span>
-      <span>Offline Archive (${count} items)</span>
+      <span>Offline Archive (${count})</span>
     `;
   } else {
     badgeElem.className =
       'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200';
     badgeElem.innerHTML = `
       <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-      <span>Live NewsAPI (${count} items)</span>
+      <span>Live NewsAPI (${count})</span>
     `;
   }
 }

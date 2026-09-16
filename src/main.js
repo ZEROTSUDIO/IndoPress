@@ -1,6 +1,6 @@
 /**
  * IndoPress - Main Orchestrator
- * Connects data layer, categorizer, presentation layer, charts, and keyword cloud.
+ * Connects data layer, categorizer, presentation layer, charts, word cloud, stats, and bookmarks.
  */
 
 import { fetchArticles } from './api.js';
@@ -10,7 +10,10 @@ import {
   renderSkeleton,
   updateStatusBadge,
   renderCategoryChips,
-  populateSourceFilter
+  populateSourceFilter,
+  renderStatsRow,
+  getBookmarks,
+  formatRelativeTime
 } from './ui.js';
 import { renderDashboardCharts } from './charts.js';
 import { extractKeywords, renderWordCloud } from './wordcloud.js';
@@ -24,11 +27,14 @@ export const appState = {
 
 // Application Filter State
 export const filterState = {
-  selectedCategory: 'all',
+  selectedCategory: 'all', // 'all' | 'bookmarks' | categoryId
   searchQuery: '',
   selectedSource: 'all',
   sortBy: 'latest' // 'latest' | 'oldest' | 'title'
 };
+
+// Timestamp tracking for relative "Updated X ago"
+let lastFetchedAt = null;
 
 // DOM References
 let dom = {};
@@ -70,16 +76,70 @@ export function computeSources(articles) {
 }
 
 /**
+ * Computes high-level overview metrics for the stats row.
+ * @param {Array} articles
+ * @param {Array} sources
+ * @param {object} categoryCounts
+ * @returns {object}
+ */
+export function computeStats(articles, sources, categoryCounts) {
+  const totalArticles = articles.length;
+  const totalSources = sources.length;
+
+  // Find dominant topic (excluding 'all' and preferring non-other if tied)
+  const validCategories = Object.entries(categoryCounts)
+    .filter(([id]) => id !== 'all' && id !== 'other');
+
+  let dominantCategory = null;
+  if (validCategories.length > 0) {
+    validCategories.sort((a, b) => b[1] - a[1]);
+    const [topId, topCount] = validCategories[0];
+    const categoryObj = Object.values(CATEGORIES).find(c => c.id === topId);
+    if (categoryObj && topCount > 0) {
+      dominantCategory = {
+        ...categoryObj,
+        count: topCount,
+        percentage: Math.round((topCount / (totalArticles || 1)) * 100)
+      };
+    }
+  }
+
+  // Determine freshness
+  let latestTimeFormatted = 'Recent';
+  if (articles.length > 0) {
+    const sorted = [...articles].sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime());
+    const newest = new Date(sorted[0].publishedAt);
+    if (!isNaN(newest.getTime())) {
+      latestTimeFormatted = formatRelativeTime(newest);
+    }
+  }
+
+  return {
+    totalArticles,
+    totalSources,
+    dominantCategory,
+    latestTimeFormatted
+  };
+}
+
+/**
  * Filters and sorts articles according to active filterState.
  * @returns {Array}
  */
 export function getFilteredArticles() {
   const query = filterState.searchQuery.trim().toLowerCase();
+  let baseArticles = appState.articles;
 
-  return appState.articles
+  // If "bookmarks" chip selected, filter from saved bookmarks
+  if (filterState.selectedCategory === 'bookmarks') {
+    const bookmarks = getBookmarks();
+    baseArticles = bookmarks;
+  }
+
+  return baseArticles
     .filter(article => {
-      // 1. Category filter
-      if (filterState.selectedCategory !== 'all') {
+      // 1. Category filter (if not 'all' and not 'bookmarks')
+      if (filterState.selectedCategory !== 'all' && filterState.selectedCategory !== 'bookmarks') {
         const catId = article.category?.id || 'other';
         if (catId !== filterState.selectedCategory) return false;
       }
@@ -119,9 +179,15 @@ export function getFilteredArticles() {
 export function applyFilters() {
   const filtered = getFilteredArticles();
 
-  // Render cards with reset callback
+  // Render cards with reset & bookmark change callbacks
   if (dom.grid) {
-    renderCards(filtered, dom.grid, resetAllFilters);
+    renderCards(filtered, dom.grid, resetAllFilters, () => {
+      // On bookmark toggle, refresh bookmark chip count
+      refreshCategoryChips();
+      if (filterState.selectedCategory === 'bookmarks') {
+        applyFilters();
+      }
+    });
   }
 
   // Update item count pill
@@ -152,23 +218,24 @@ export function resetAllFilters() {
   if (dom.sourceFilter) dom.sourceFilter.value = 'all';
   if (dom.sortSelect) dom.sortSelect.value = 'latest';
 
-  // Re-render chips to reflect 'all' selected
   refreshCategoryChips();
   applyFilters();
 }
 
 /**
- * Re-renders the category filter chips bar.
+ * Re-renders the category filter chips bar including bookmarks count.
  */
 function refreshCategoryChips() {
   if (!dom.chipsContainer) return;
   const counts = computeCategoryCounts(appState.articles);
+  const bookmarks = getBookmarks();
 
   renderCategoryChips({
     container: dom.chipsContainer,
     categories: CATEGORIES,
     activeCategory: filterState.selectedCategory,
     counts,
+    bookmarkCount: bookmarks.length,
     onSelect: (catId) => {
       filterState.selectedCategory = catId;
       refreshCategoryChips();
@@ -206,7 +273,90 @@ function setupAnalytics() {
 }
 
 /**
- * Sets up interactive event listeners for search and filter controls.
+ * Fetches data and updates all UI sections (stats, charts, chips, feed).
+ */
+async function loadData(isRefresh = false) {
+  if (!isRefresh && dom.grid) {
+    renderSkeleton(dom.grid, 6);
+  }
+
+  try {
+    const result = await fetchArticles();
+    appState.articles = result.articles || [];
+    appState.isMock = result.isMock;
+    appState.totalResults = result.totalResults || appState.articles.length;
+    lastFetchedAt = new Date();
+
+    const sources = computeSources(appState.articles);
+    const categoryCounts = computeCategoryCounts(appState.articles);
+
+    // 1. Update Connection Badge
+    if (dom.badge) {
+      updateStatusBadge(dom.badge, appState.isMock, appState.articles.length);
+    }
+
+    // 2. Update Stats Row
+    if (dom.statsRow) {
+      const stats = computeStats(appState.articles, sources, categoryCounts);
+      renderStatsRow(stats, dom.statsRow);
+    }
+
+    // 3. Populate Category Chips & Source Filter
+    refreshCategoryChips();
+    if (dom.sourceFilter) {
+      populateSourceFilter(dom.sourceFilter, sources, filterState.selectedSource);
+    }
+
+    // 4. Initialize or update charts & word cloud
+    setupAnalytics();
+
+    // 5. Render cards
+    applyFilters();
+
+    // 6. Update last updated text
+    if (dom.lastUpdatedText) {
+      dom.lastUpdatedText.textContent = 'Updated just now';
+    }
+
+    console.log(`[IndoPress] Loaded ${appState.articles.length} articles (Mock: ${appState.isMock})`);
+  } catch (err) {
+    console.error('[IndoPress] Data retrieval failed:', err);
+    if (dom.grid) {
+      dom.grid.innerHTML = `
+        <div class="col-span-full p-8 text-center bg-red-50 text-red-700 rounded-xl border border-red-200">
+          <p class="font-bold">Failed to load articles.</p>
+          <p class="text-sm mt-1">${err.message}</p>
+        </div>
+      `;
+    }
+  }
+}
+
+/**
+ * Triggers a manual refresh with visual button animation.
+ */
+async function triggerRefresh() {
+  if (dom.refreshIcon) {
+    dom.refreshIcon.classList.add('animate-spin');
+  }
+  if (dom.refreshBtn) {
+    dom.refreshBtn.disabled = true;
+  }
+
+  await loadData(true);
+
+  setTimeout(() => {
+    if (dom.refreshIcon) {
+      dom.refreshIcon.classList.remove('animate-spin');
+    }
+    if (dom.refreshBtn) {
+      dom.refreshBtn.disabled = false;
+    }
+  }, 400);
+}
+
+/**
+ * Sets up interactive event listeners for search, filter, and refresh controls.
  */
 function setupEventListeners() {
   // Live search input
@@ -244,6 +394,24 @@ function setupEventListeners() {
       applyFilters();
     });
   }
+
+  // Manual refresh button
+  if (dom.refreshBtn) {
+    dom.refreshBtn.addEventListener('click', triggerRefresh);
+  }
+
+  // Live timer tick every 30 seconds for "Updated X ago"
+  setInterval(() => {
+    if (dom.lastUpdatedText && lastFetchedAt) {
+      dom.lastUpdatedText.textContent = `Updated ${formatRelativeTime(lastFetchedAt)}`;
+    }
+  }, 30000);
+
+  // Auto-refresh feed every 15 minutes
+  setInterval(() => {
+    console.log('[IndoPress] Auto-refreshing feed (15m interval)...');
+    loadData(true);
+  }, 15 * 60 * 1000);
 }
 
 /**
@@ -254,6 +422,7 @@ async function initApp() {
     grid: document.getElementById('article-grid'),
     count: document.getElementById('article-count'),
     badge: document.getElementById('data-status-badge'),
+    statsRow: document.getElementById('stats-row'),
     chipsContainer: document.getElementById('category-chips-container'),
     searchInput: document.getElementById('search-input'),
     searchClearBtn: document.getElementById('search-clear-btn'),
@@ -261,53 +430,14 @@ async function initApp() {
     sortSelect: document.getElementById('sort-select'),
     sourceChart: document.getElementById('source-chart'),
     topicChart: document.getElementById('topic-chart'),
-    wordCloudContainer: document.getElementById('wordcloud-container')
+    wordCloudContainer: document.getElementById('wordcloud-container'),
+    refreshBtn: document.getElementById('refresh-btn'),
+    refreshIcon: document.getElementById('refresh-icon'),
+    lastUpdatedText: document.getElementById('last-updated-text')
   };
 
-  // Show skeleton loading state
-  if (dom.grid) {
-    renderSkeleton(dom.grid, 6);
-  }
-
-  try {
-    // Fetch data
-    const result = await fetchArticles();
-    appState.articles = result.articles || [];
-    appState.isMock = result.isMock;
-    appState.totalResults = result.totalResults || appState.articles.length;
-
-    // Update status badge
-    if (dom.badge) {
-      updateStatusBadge(dom.badge, appState.isMock, appState.articles.length);
-    }
-
-    // Populate category chips & source filter options
-    refreshCategoryChips();
-    if (dom.sourceFilter) {
-      populateSourceFilter(dom.sourceFilter, computeSources(appState.articles), filterState.selectedSource);
-    }
-
-    // Initialize charts and keyword cloud
-    setupAnalytics();
-
-    // Setup interactive listeners
-    setupEventListeners();
-
-    // Render filtered cards
-    applyFilters();
-
-    console.log(`[IndoPress] Initialized with ${appState.articles.length} articles (Mock: ${appState.isMock})`);
-  } catch (err) {
-    console.error('[IndoPress] Initialization failed:', err);
-    if (dom.grid) {
-      dom.grid.innerHTML = `
-        <div class="col-span-full p-8 text-center bg-red-50 text-red-700 rounded-xl border border-red-200">
-          <p class="font-bold">Failed to load articles.</p>
-          <p class="text-sm mt-1">${err.message}</p>
-        </div>
-      `;
-    }
-  }
+  setupEventListeners();
+  await loadData();
 }
 
 // Bootstrap on DOM ready

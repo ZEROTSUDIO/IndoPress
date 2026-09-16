@@ -8,7 +8,6 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
-      darkMode: 'class',
       theme: {
         extend: {
           fontFamily: {
@@ -22,9 +21,9 @@
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <style>
-    /* Hide scrollbar for category chips bar while allowing horizontal scroll */
+    /* Hide scrollbar for category chips bar while allowing smooth horizontal scroll */
     .no-scrollbar::-webkit-scrollbar {
       display: none;
     }
@@ -34,10 +33,10 @@
     }
   </style>
 </head>
-<body class="bg-slate-50 text-slate-900 min-h-screen font-sans antialiased flex flex-col">
+<body class="bg-slate-50 text-slate-900 min-h-screen font-sans antialiased flex flex-col selection:bg-red-500 selection:text-white">
 
   <!-- Top Navigation Bar -->
-  <header class="sticky top-0 z-40 bg-white/90 backdrop-blur-md border-b border-slate-200">
+  <header class="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
       
       <!-- Brand Logo -->
@@ -53,12 +52,31 @@
         </div>
       </div>
 
-      <!-- Live Connection Status Badge -->
+      <!-- Live Status & Refresh Actions -->
       <div class="flex items-center gap-3">
+        <!-- Relative Last Updated Text -->
+        <span id="last-updated-text" class="text-xs text-slate-500 font-medium hidden md:inline">
+          Updated just now
+        </span>
+
+        <!-- Live Connection Status Badge -->
         <div id="data-status-badge" class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
           <span class="w-2 h-2 rounded-full bg-slate-400"></span>
           <span>Connecting...</span>
         </div>
+
+        <!-- Refresh Button -->
+        <button
+          id="refresh-btn"
+          type="button"
+          class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition shadow-sm cursor-pointer"
+          title="Refresh headlines from NewsAPI"
+        >
+          <svg id="refresh-icon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          <span class="hidden sm:inline">Refresh</span>
+        </button>
       </div>
 
     </div>
@@ -74,7 +92,7 @@
           International Press Intelligence
         </h2>
         <p class="mt-1 text-sm text-slate-600">
-          Visualizing how global media reports on Indonesia in real time.
+          Real-time global headlines covering Indonesia with automated topic categorization and source analytics.
         </p>
       </div>
       <div class="flex items-center gap-2 text-sm text-slate-600">
@@ -85,6 +103,11 @@
         <span>articles</span>
       </div>
     </div>
+
+    <!-- Quick Stats Metric Row (Iteration 5) -->
+    <section id="stats-row" class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <!-- Rendered dynamically by ui.js -->
+    </section>
 
     <!-- Analytics & Visualizations Section -->
     <section id="analytics-section" class="space-y-6">
@@ -163,7 +186,7 @@
           <button
             id="search-clear-btn"
             type="button"
-            class="hidden absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition"
+            class="hidden absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition cursor-pointer"
             title="Clear search"
           >
             ✕

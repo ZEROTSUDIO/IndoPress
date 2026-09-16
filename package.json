@@ -1,0 +1,23 @@
+{
+  "name": "indopress",
+  "version": "1.0.0",
+  "description": "Global News Intelligence Dashboard tracking international press coverage of Indonesia",
+  "main": "server.mjs",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs",
+    "dev": "node server.mjs",
+    "test": "node test-categorizer.mjs"
+  },
+  "keywords": [
+    "news",
+    "dashboard",
+    "indonesia",
+    "data-visualization",
+    "chartjs",
+    "tailwind",
+    "newsapi"
+  ],
+  "author": "IndoPress Team",
+  "license": "MIT"
+}
