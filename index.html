@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>IndoPress — Global News Dashboard</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen">
+  <div id="app" class="max-w-7xl mx-auto px-4 py-8">
+    <header class="mb-8 text-center sm:text-left">
+      <h1 class="text-3xl font-bold tracking-tight text-slate-900">IndoPress</h1>
+      <p class="text-slate-600 mt-1">International press coverage of Indonesia</p>
+    </header>
+
+    <main id="main-content">
+      <div id="status-card" class="p-4 bg-white border border-slate-200 rounded-lg shadow-sm">
+        <h2 class="text-lg font-semibold mb-2">Iteration 1: Data Layer & Categorizer Initialized</h2>
+        <p class="text-sm text-slate-600 mb-3">Checking articles and automated categorization pipeline...</p>
+        <pre id="output-log" class="bg-slate-900 text-slate-100 p-4 rounded text-xs overflow-x-auto">Loading...</pre>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
