@@ -1,6 +1,6 @@
 /**
  * IndoPress - Main Orchestrator
- * Connects the data layer (api.js), categorizer (categorizer.js), and presentation layer (ui.js).
+ * Connects data layer, categorizer, presentation layer, charts, and keyword cloud.
  */
 
 import { fetchArticles } from './api.js';
@@ -12,6 +12,8 @@ import {
   renderCategoryChips,
   populateSourceFilter
 } from './ui.js';
+import { renderDashboardCharts } from './charts.js';
+import { extractKeywords, renderWordCloud } from './wordcloud.js';
 
 // Application Data State
 export const appState = {
@@ -176,6 +178,34 @@ function refreshCategoryChips() {
 }
 
 /**
+ * Renders data visualizations (bar chart, donut chart, word cloud).
+ */
+function setupAnalytics() {
+  const sources = computeSources(appState.articles);
+  const categoryCounts = computeCategoryCounts(appState.articles);
+
+  // 1. Render Chart.js charts
+  renderDashboardCharts({
+    sourceCanvas: dom.sourceChart,
+    topicCanvas: dom.topicChart,
+    sources,
+    categoryCounts,
+    categories: CATEGORIES
+  });
+
+  // 2. Extract and render keyword cloud
+  const keywords = extractKeywords(appState.articles, 20);
+  renderWordCloud(dom.wordCloudContainer, keywords, (clickedWord) => {
+    filterState.searchQuery = clickedWord;
+    if (dom.searchInput) {
+      dom.searchInput.value = clickedWord;
+      dom.searchInput.focus();
+    }
+    applyFilters();
+  });
+}
+
+/**
  * Sets up interactive event listeners for search and filter controls.
  */
 function setupEventListeners() {
@@ -228,7 +258,10 @@ async function initApp() {
     searchInput: document.getElementById('search-input'),
     searchClearBtn: document.getElementById('search-clear-btn'),
     sourceFilter: document.getElementById('source-filter'),
-    sortSelect: document.getElementById('sort-select')
+    sortSelect: document.getElementById('sort-select'),
+    sourceChart: document.getElementById('source-chart'),
+    topicChart: document.getElementById('topic-chart'),
+    wordCloudContainer: document.getElementById('wordcloud-container')
   };
 
   // Show skeleton loading state
@@ -253,6 +286,9 @@ async function initApp() {
     if (dom.sourceFilter) {
       populateSourceFilter(dom.sourceFilter, computeSources(appState.articles), filterState.selectedSource);
     }
+
+    // Initialize charts and keyword cloud
+    setupAnalytics();
 
     // Setup interactive listeners
     setupEventListeners();
