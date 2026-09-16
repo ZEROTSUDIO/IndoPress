@@ -40,44 +40,65 @@ export function normalizeArticle(article) {
  * @returns {Promise<{articles: Array, isMock: boolean, totalResults: number}>}
  */
 export async function fetchArticles({ apiKey = '', query = 'indonesia', forceMock = false } = {}) {
-  // If explicitly forced or no key provided, return mock data directly
-  if (forceMock || !apiKey) {
+  // If explicitly forced mock, return mock data directly
+  if (forceMock) {
     const enriched = mockArticles.map(normalizeArticle);
     return {
       articles: enriched,
       isMock: true,
       totalResults: enriched.length,
-      message: 'Using offline mock dataset (no API key provided).'
+      message: 'Using offline mock dataset (forced mock mode).'
     };
   }
 
-  const url = `${NEWS_API_ENDPOINT}?qInTitle=${encodeURIComponent(query)}&language=en&sortBy=publishedAt&pageSize=40&apiKey=${apiKey}`;
-
-  try {
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(`NewsAPI error [${response.status}]: ${errorData.message || response.statusText}`);
+  // 1. In browser environments, try local or serverless proxy (/api/news) first
+  if (typeof window !== 'undefined' && window.location && window.location.protocol.startsWith('http')) {
+    try {
+      const proxyUrl = `/api/news?query=${encodeURIComponent(query)}&sortBy=publishedAt&pageSize=40`;
+      const response = await fetch(proxyUrl);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.status === 'ok' && Array.isArray(data.articles)) {
+          const enriched = data.articles.map(normalizeArticle);
+          return {
+            articles: enriched,
+            isMock: false,
+            totalResults: data.totalResults || enriched.length
+          };
+        }
+      }
+    } catch (err) {
+      console.warn('Proxy /api/news request failed or unavailable:', err.message);
     }
-
-    const data = await response.json();
-    const rawArticles = Array.isArray(data.articles) ? data.articles : [];
-    const enriched = rawArticles.map(normalizeArticle);
-
-    return {
-      articles: enriched,
-      isMock: false,
-      totalResults: data.totalResults || enriched.length
-    };
-  } catch (err) {
-    console.warn('NewsAPI fetch failed (likely CORS or rate limit). Falling back to mock data.', err.message);
-    const enriched = mockArticles.map(normalizeArticle);
-    return {
-      articles: enriched,
-      isMock: true,
-      totalResults: enriched.length,
-      fallbackReason: err.message
-    };
   }
+
+  // 2. Direct API call if apiKey is explicitly provided
+  if (apiKey) {
+    try {
+      const url = `${NEWS_API_ENDPOINT}?qInTitle=${encodeURIComponent(query)}&language=en&sortBy=publishedAt&pageSize=40&apiKey=${apiKey}`;
+      const response = await fetch(url);
+
+      if (response.ok) {
+        const data = await response.json();
+        const rawArticles = Array.isArray(data.articles) ? data.articles : [];
+        const enriched = rawArticles.map(normalizeArticle);
+        return {
+          articles: enriched,
+          isMock: false,
+          totalResults: data.totalResults || enriched.length
+        };
+      }
+    } catch (err) {
+      console.warn('Direct NewsAPI fetch failed:', err.message);
+    }
+  }
+
+  // 3. Fallback to mock dataset
+  const enriched = mockArticles.map(normalizeArticle);
+  return {
+    articles: enriched,
+    isMock: true,
+    totalResults: enriched.length,
+    message: 'Using offline mock dataset.'
+  };
 }
