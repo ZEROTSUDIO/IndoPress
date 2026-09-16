@@ -1,6 +1,6 @@
 /**
  * IndoPress - UI Rendering Engine
- * Handles rendering article cards, skeletons, badges, and empty states.
+ * Handles rendering article cards, skeletons, filter chips, source dropdowns, and empty states.
  */
 
 // Elegant SVG placeholder when an article image is missing or fails to load
@@ -146,21 +146,14 @@ function escapeHtml(str) {
  * Renders an array of articles into the specified container element.
  * @param {Array} articles
  * @param {HTMLElement} container
+ * @param {Function} [onReset] - Optional callback for resetting filters when empty
  */
-export function renderCards(articles, container) {
+export function renderCards(articles, container, onReset = null) {
   if (!container) return;
   container.innerHTML = '';
 
   if (!articles || articles.length === 0) {
-    container.innerHTML = `
-      <div class="col-span-full py-16 text-center bg-white rounded-xl border border-slate-200">
-        <div class="inline-flex items-center justify-center w-12 h-12 rounded-full bg-slate-100 text-slate-500 mb-3 text-2xl">
-          🔍
-        </div>
-        <h4 class="text-base font-semibold text-slate-800 mb-1">No articles found</h4>
-        <p class="text-sm text-slate-500 max-w-sm mx-auto">There are currently no articles matching the criteria.</p>
-      </div>
-    `;
+    renderEmptyState(container, onReset);
     return;
   }
 
@@ -169,6 +162,118 @@ export function renderCards(articles, container) {
     fragment.appendChild(createArticleCard(article));
   });
   container.appendChild(fragment);
+}
+
+/**
+ * Renders an empty state view with a reset action.
+ * @param {HTMLElement} container
+ * @param {Function} [onReset]
+ */
+export function renderEmptyState(container, onReset) {
+  const emptyDiv = document.createElement('div');
+  emptyDiv.className = 'col-span-full py-16 text-center bg-white rounded-xl border border-slate-200 shadow-sm';
+  emptyDiv.innerHTML = `
+    <div class="inline-flex items-center justify-center w-14 h-14 rounded-full bg-slate-100 text-slate-500 mb-3 text-2xl">
+      🔍
+    </div>
+    <h4 class="text-lg font-bold text-slate-900 mb-1">No matching articles found</h4>
+    <p class="text-sm text-slate-500 max-w-sm mx-auto mb-5">
+      We couldn't find any articles matching your active search keyword or category filters.
+    </p>
+    <button
+      id="reset-filters-btn"
+      type="button"
+      class="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-slate-900 text-white text-xs font-semibold hover:bg-slate-800 transition shadow-sm"
+    >
+      <span>✕</span>
+      <span>Clear all filters</span>
+    </button>
+  `;
+
+  if (onReset) {
+    const btn = emptyDiv.querySelector('#reset-filters-btn');
+    if (btn) btn.addEventListener('click', onReset);
+  }
+
+  container.appendChild(emptyDiv);
+}
+
+/**
+ * Renders category filter chips into the container.
+ * @param {object} params
+ * @param {HTMLElement} params.container
+ * @param {object} params.categories
+ * @param {string} params.activeCategory
+ * @param {object} params.counts - { all: number, politics: number, ... }
+ * @param {Function} params.onSelect - Callback receiving categoryId
+ */
+export function renderCategoryChips({ container, categories, activeCategory, counts, onSelect }) {
+  if (!container) return;
+  container.innerHTML = '';
+
+  const totalCount = counts.all || 0;
+  const chipList = [
+    { id: 'all', label: 'All', icon: '🌐', count: totalCount },
+    ...Object.values(categories).map(cat => ({
+      id: cat.id,
+      label: cat.label,
+      icon: cat.icon,
+      count: counts[cat.id] || 0
+    }))
+  ];
+
+  const fragment = document.createDocumentFragment();
+
+  chipList.forEach(item => {
+    const isActive = item.id === activeCategory;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.dataset.category = item.id;
+
+    if (isActive) {
+      btn.className =
+        'flex-shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-slate-900 text-white shadow-sm transition';
+    } else {
+      btn.className =
+        'flex-shrink-0 inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 hover:text-slate-900 transition';
+    }
+
+    const countClass = isActive ? 'bg-slate-800 text-slate-200' : 'bg-slate-100 text-slate-600';
+
+    btn.innerHTML = `
+      <span>${item.icon}</span>
+      <span>${item.label}</span>
+      <span class="ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-bold ${countClass}">${item.count}</span>
+    `;
+
+    btn.addEventListener('click', () => {
+      if (onSelect) onSelect(item.id);
+    });
+
+    fragment.appendChild(btn);
+  });
+
+  container.appendChild(fragment);
+}
+
+/**
+ * Populates source filter dropdown options.
+ * @param {HTMLSelectElement} selectElem
+ * @param {Array<{name: string, count: number}>} sources
+ * @param {string} activeSource
+ */
+export function populateSourceFilter(selectElem, sources, activeSource = 'all') {
+  if (!selectElem) return;
+
+  const totalArticles = sources.reduce((acc, s) => acc + s.count, 0);
+  let html = `<option value="all" ${activeSource === 'all' ? 'selected' : ''}>All Sources (${totalArticles})</option>`;
+
+  sources.forEach(src => {
+    const isSelected = src.name === activeSource ? 'selected' : '';
+    html += `<option value="${escapeHtml(src.name)}" ${isSelected}>${escapeHtml(src.name)} (${src.count})</option>`;
+  });
+
+  selectElem.innerHTML = html;
 }
 
 /**

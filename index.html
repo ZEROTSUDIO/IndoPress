@@ -21,6 +21,16 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* Hide scrollbar for category chips bar while allowing horizontal scroll */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
 </head>
 <body class="bg-slate-50 text-slate-900 min-h-screen font-sans antialiased flex flex-col">
 
@@ -56,7 +66,7 @@
   <main class="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 w-full">
 
     <!-- Page Title & Feed Intro -->
-    <div class="mb-8 flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200 pb-5">
+    <div class="mb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-slate-200 pb-5">
       <div>
         <h2 class="text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
           International Press Feed
@@ -73,6 +83,67 @@
         <span>articles</span>
       </div>
     </div>
+
+    <!-- Filters & Search Toolbar -->
+    <section class="mb-8 space-y-4">
+      <!-- Search, Source & Sort Row -->
+      <div class="flex flex-col md:flex-row gap-3 items-stretch md:items-center justify-between">
+        
+        <!-- Live Search Input -->
+        <div class="relative flex-1">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <input
+            id="search-input"
+            type="text"
+            placeholder="Search headlines, keywords, or topics..."
+            class="w-full pl-10 pr-10 py-2.5 bg-white border border-slate-300 rounded-lg text-sm text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 transition shadow-sm"
+          />
+          <button
+            id="search-clear-btn"
+            type="button"
+            class="hidden absolute inset-y-0 right-0 pr-3.5 flex items-center text-slate-400 hover:text-slate-600 transition"
+            title="Clear search"
+          >
+            ✕
+          </button>
+        </div>
+
+        <!-- Controls Group: Source & Sort -->
+        <div class="flex flex-wrap sm:flex-nowrap gap-3 items-center">
+          <!-- Source Filter Dropdown -->
+          <div class="w-full sm:w-auto">
+            <select
+              id="source-filter"
+              class="w-full sm:w-auto py-2.5 pl-3 pr-8 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 shadow-sm transition"
+            >
+              <option value="all">All Sources</option>
+            </select>
+          </div>
+
+          <!-- Sort Dropdown -->
+          <div class="w-full sm:w-auto">
+            <select
+              id="sort-select"
+              class="w-full sm:w-auto py-2.5 pl-3 pr-8 bg-white border border-slate-300 rounded-lg text-sm text-slate-700 font-medium focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-red-500 shadow-sm transition"
+            >
+              <option value="latest">⏱️ Latest First</option>
+              <option value="oldest">⏳ Oldest First</option>
+              <option value="title">🔤 Title (A–Z)</option>
+            </select>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Category Filter Chips Bar -->
+      <div id="category-chips-container" class="flex items-center gap-2 overflow-x-auto pb-1 pt-1 no-scrollbar">
+        <!-- Rendered dynamically by ui.js -->
+      </div>
+    </section>
 
     <!-- Article Cards Grid (1 col mobile, 2 col tablet, 3 col desktop) -->
     <section id="article-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
